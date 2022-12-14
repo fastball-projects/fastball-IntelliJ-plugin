@@ -1,0 +1,48 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>dev.fastball.fastball-IntelliJ-plugin</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>Fastball</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="gr@fastball.dev" url="https://fastball.dev">Fastball</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+    <a href="https://github.com/fastball-projects/fastball">Fastball Github</a> |
+    <a href="https://github.com/fastball-projects/fastball-IntelliJ-plugin">Plugin Github</a>
+    <p>
+    Fastball 是一个面向后端开发人员的, 可扩展的, 所见即所得的 Web UI 开发框架.
+    </p>
+
+    <p>
+    Fastball is an extension-oriented Wysiwyg UI framework for Java backends. Save your development time, try Fastball!
+    </p>
+  ]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceInterface="dev.fastball.intellij.plugin.FastballWebService"
+                        serviceImplementation="dev.fastball.intellij.plugin.FastballWebServiceImpl"/>
+
+        <fileEditorProvider id="FastballViewEditor"
+                            implementation="dev.fastball.intellij.plugin.FastballViewEditorProvider"/>
+        <fileEditorProvider id="FastballPreviewEditor"
+                            implementation="dev.fastball.intellij.plugin.FastballPreviewEditorProvider"
+                            order="after FastballViewEditor"/>
+        <fileEditorProvider id="FastballJsonViewEditor"
+                            implementation="dev.fastball.intellij.plugin.FastballJsonViewEditorProvider"
+                            order="last"/>
+    </extensions>
+</idea-plugin>
