@@ -21,7 +21,7 @@ import java.beans.PropertyChangeListener
  */
 class FastballPreviewEditor(
     file: VirtualFile, port: Int, className: String
-) : FastballBrowserEditor("http://localhost:$port/fastball-editor/preview.html?className=$className", file) {
+) : FastballBrowserEditor(buildPreviewUrl(port, className), file) {
     override fun getName() = "Preview"
 }
 
@@ -34,7 +34,7 @@ class FastballPreviewEditorProvider : FastballBrowserEditorProvider() {
 
 class FastballViewEditor(
     file: VirtualFile, port: Int, className: String
-) : FastballBrowserEditor("http://localhost:$port/fastball-editor/index.html?className=$className", file) {
+) : FastballBrowserEditor(buildEditorUrl(port, className), file) {
     override fun getName() = "UI Editor"
 }
 

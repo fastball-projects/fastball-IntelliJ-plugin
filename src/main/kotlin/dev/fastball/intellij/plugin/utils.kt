@@ -18,6 +18,19 @@ import java.net.ServerSocket
  */
 private val objectMapper = ObjectMapper()
 
+fun buildEditorUrl(port: Int, className: String) = buildProxyUrl(port, className, "index")
+fun buildPreviewUrl(port: Int, className: String) = buildProxyUrl(port, className, "preview")
+
+private fun buildProxyUrl(port: Int, className: String, viewType: String): String {
+    var url = "http://localhost:$port/fastball-editor/$viewType.html?className=$className"
+    FastballSettingsState.instance.let {
+        if (it.proxyEnabled) {
+            url += "&proxyTarget=${it.proxyTarget}"
+        }
+    }
+    return url
+}
+
 fun inputStreamToPrettyJson(input: InputStream): String = objectMapper.readTree(input).toPrettyString()
 
 fun toJson(obj: Any): String = objectMapper.writeValueAsString(obj)

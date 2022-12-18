@@ -29,12 +29,23 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    <depends>com.intellij.modules.idea</depends>
+
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
+
         <projectService serviceInterface="dev.fastball.intellij.plugin.FastballWebService"
                         serviceImplementation="dev.fastball.intellij.plugin.FastballWebServiceImpl"/>
+
+        <projectConfigurable
+                parentId="tools"
+                instance="dev.fastball.intellij.plugin.FastballSettingsConfigurable"
+                id="dev.fastball.intellij.plugin.FastballSettingsConfigurable"
+                displayName="Fastball"/>
+
+        <applicationService serviceImplementation="dev.fastball.intellij.plugin.FastballSettingsState"/>
 
         <fileEditorProvider id="FastballViewEditor"
                             implementation="dev.fastball.intellij.plugin.FastballViewEditorProvider"/>
