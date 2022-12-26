@@ -24,7 +24,7 @@ class FastballJsonViewEditor(
 
 class FastballJsonViewEditorProvider : TextEditorProvider() {
     override fun accept(project: Project, file: VirtualFile): Boolean {
-        if (file.extension != "java") {
+        if (file.extension != JAVA_FILE_EXT) {
             return false
         }
         return getViewFile(project, file) != null
@@ -32,9 +32,9 @@ class FastballJsonViewEditorProvider : TextEditorProvider() {
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
         val viewFile = getViewFile(project, file) ?: throw IllegalStateException()
-        return FastballJsonViewEditor(project, viewFile, this, "ViewJson")
+        return FastballJsonViewEditor(project, viewFile, this, VIEW_JSON_TAB_NAME)
     }
 
-    override fun getEditorTypeId() = "FastballViewJsonEditorProvider"
+    override fun getEditorTypeId(): String = FastballJsonViewEditorProvider::class.java.simpleName
     override fun getPolicy() = FileEditorPolicy.PLACE_AFTER_DEFAULT_EDITOR
 }

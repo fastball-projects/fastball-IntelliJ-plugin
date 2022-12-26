@@ -4,7 +4,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.externalSystem.service.execution.NotSupportedException
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
@@ -17,7 +16,6 @@ import org.apache.http.client.methods.*
 import org.apache.http.entity.InputStreamEntity
 import org.apache.http.impl.client.HttpClients
 import org.yaml.snakeyaml.Yaml
-import java.io.FileInputStream
 import java.net.InetSocketAddress
 
 
@@ -28,6 +26,7 @@ import java.net.InetSocketAddress
  */
 interface FastballWebService {
     val port: Int
+    val project: Project
     val fileMapper: HashMap<String, VirtualFile>
 
     companion object {
@@ -37,14 +36,24 @@ interface FastballWebService {
     }
 }
 
-class FastballWebServiceImpl : FastballWebService {
+class FastballWebServiceImpl(override val project: Project) : FastballWebService {
     override val port = findFreePort()
     override val fileMapper = hashMapOf<String, VirtualFile>()
 
     init {
+        val app = ApplicationManager.getApplication()
+        app.runReadAction {
+            FilenameIndex.getAllFilesByExt(project, VIEW_FILE_EXT, GlobalSearchScope.projectScope(project))
+                .forEach { file ->
+                    fromJson(file.contentsToByteArray()).get(CLASS_NAME_PARAM)?.asText()?.let { className ->
+                        fileMapper[className] = file
+                    }
+                }
+        }
+
         val handlers = listOf(
             StaticResourceHandler(),
-            LoadAssetsHandler(),
+            LoadAssetsHandler(this),
             LoadViewHandler(this),
             SaveViewHandler(this),
             ProxyHandler()
@@ -59,7 +68,7 @@ class FastballWebServiceImpl : FastballWebService {
 }
 
 class StaticResourceHandler : AutoOutputWebHandler {
-    override val contextPath = "/fastball-editor"
+    override val contextPath = CONTEXT_PATH
     override fun handlerRequest(exchange: HttpExchange): ByteArray {
 //            return FileInputStream("/Users/gr/fastball-projects/editor/" + exchange.requestURI.path).readAllBytes()
         val staticResource = FastballWebService::class.java.getResourceAsStream(exchange.requestURI.path)
@@ -68,41 +77,38 @@ class StaticResourceHandler : AutoOutputWebHandler {
     }
 }
 
-class LoadAssetsHandler : AutoOutputWebHandler {
+class LoadAssetsHandler(private val webService: FastballWebService) : AutoOutputWebHandler {
     private val yaml = Yaml()
-    override val contextPath = "/fastball-editor/api/assets"
+    override val contextPath = ASSETS_API_PATH
     override fun handlerRequest(exchange: HttpExchange): ByteArray {
         val app = ApplicationManager.getApplication()
         var maps = listOf<Map<String, Any>>()
         app.runReadAction {
-            maps = ProjectManager.getInstance().openProjects.flatMap {
-                FilenameIndex.getFilesByName(
-                    ProjectManager.getInstance().defaultProject,
-                    "fastball-material.yml",
-                    GlobalSearchScope.projectScope(it)
-                ).map { file -> yaml.load(file.text) }
-            }
+            maps = FilenameIndex.getVirtualFilesByName(
+                FASTBALL_MATERIAL_FILE_NAME,
+                GlobalSearchScope.projectScope(webService.project)
+            ).map { file -> yaml.load(file.inputStream) }
         }
         return toJson(maps).toByteArray()
     }
 }
 
 class LoadViewHandler(private val webService: FastballWebService) : AutoOutputWebHandler {
-    override val contextPath = "/fastball-editor/api/load-view"
+    override val contextPath = LOAD_VIEW_API_PATH
     override fun handlerRequest(exchange: HttpExchange): ByteArray {
         val query = queryStringToMap(exchange.requestURI.query)
-        val viewFile = webService.fileMapper[query["className"]] ?: return byteArrayOf()
+        val viewFile = webService.fileMapper[query[CLASS_NAME_PARAM]] ?: return byteArrayOf()
         return viewFile.contentsToByteArray()
     }
 }
 
 class SaveViewHandler(private val webService: FastballWebService) : AutoOutputWebHandler {
-    override val contextPath = "/fastball-editor/api/save-view"
+    override val contextPath = SAVE_VIEW_API_PATH
     override fun handlerRequest(exchange: HttpExchange): ByteArray {
         val query = queryStringToMap(exchange.requestURI.query)
-        val viewFile: VirtualFile = webService.fileMapper[query["className"]] ?: return byteArrayOf()
+        val viewFile: VirtualFile = webService.fileMapper[query[CLASS_NAME_PARAM]] ?: return byteArrayOf()
         val viewContent = inputStreamToPrettyJson(exchange.requestBody)
-        WriteCommandAction.runWriteCommandAction(ProjectManager.getInstance().defaultProject) {
+        WriteCommandAction.runWriteCommandAction(webService.project) {
             viewFile.setBinaryContent(viewContent.toByteArray())
         }
         return viewFile.contentsToByteArray()
@@ -110,11 +116,11 @@ class SaveViewHandler(private val webService: FastballWebService) : AutoOutputWe
 }
 
 class ProxyHandler : WebHandler {
-    override val contextPath = "/fastball-editor/proxy"
+    override val contextPath = PROXY_PATH
     override fun handle(exchange: HttpExchange) {
         try {
-            val proxy = exchange.requestHeaders.getFirst("Fastball-Proxy")
-                ?: throw IllegalArgumentException("Request header [Fastball-Proxy] not found")
+            val proxy = exchange.requestHeaders.getFirst(PROXY_HEADER)
+                ?: throw IllegalArgumentException("Request header [$PROXY_HEADER] not found")
             val path = exchange.requestURI.path.substring(contextPath.length)
             val proxyTarget = proxy + path
             val request = when (exchange.requestMethod) {
@@ -126,7 +132,7 @@ class ProxyHandler : WebHandler {
                 "HEAD" -> HttpHead(proxyTarget)
                 "TRACE" -> HttpTrace(proxyTarget)
                 "OPTIONS" -> HttpOptions(proxyTarget)
-                else -> throw NotSupportedException("proxy not support method[" + exchange.requestMethod + "]")
+                else -> throw NotSupportedException("Proxy not support method[" + exchange.requestMethod + "]")
             }
             if (request is HttpEntityEnclosingRequestBase) {
                 val httpEntity: HttpEntity = InputStreamEntity(exchange.requestBody)
@@ -134,7 +140,7 @@ class ProxyHandler : WebHandler {
             }
             exchange.requestHeaders.entries.forEach { (header, headerValues): Map.Entry<String, List<String>> ->
                 for (value in headerValues) {
-                    if ("Content-length".equals(header, ignoreCase = true)) {
+                    if (CONTENT_LENGTH_HEADER.equals(header, ignoreCase = true)) {
                         continue
                     }
                     request.addHeader(header, value)

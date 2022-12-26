@@ -22,34 +22,32 @@ import java.beans.PropertyChangeListener
 class FastballPreviewEditor(
     file: VirtualFile, port: Int, className: String
 ) : FastballBrowserEditor(buildPreviewUrl(port, className), file) {
-    override fun getName() = "Preview"
+    override fun getName() = PREVIEW_TAB_NAME
 }
 
 class FastballPreviewEditorProvider : FastballBrowserEditorProvider() {
     override fun createEditor(file: VirtualFile, port: Int, className: String) =
         FastballPreviewEditor(file, port, className)
-
-    override fun getEditorTypeId() = "FastballPreviewEditorProvider"
 }
 
 class FastballViewEditor(
     file: VirtualFile, port: Int, className: String
 ) : FastballBrowserEditor(buildEditorUrl(port, className), file) {
-    override fun getName() = "UI Editor"
+    override fun getName() = EDITOR_TAB_NAME
 }
 
 class FastballViewEditorProvider : FastballBrowserEditorProvider() {
     override fun createEditor(file: VirtualFile, port: Int, className: String) =
         FastballViewEditor(file, port, className)
-
-    override fun getEditorTypeId() = "FastballViewEditorProvider"
 }
 
 abstract class FastballBrowserEditorProvider : FileEditorProvider {
     abstract fun createEditor(file: VirtualFile, port: Int, className: String): FastballBrowserEditor
 
+    override fun getEditorTypeId(): String = this.javaClass.simpleName
+
     override fun accept(project: Project, file: VirtualFile): Boolean {
-        if (file.extension != "java") {
+        if (file.extension != JAVA_FILE_EXT) {
             return false
         }
         return getViewFile(project, file) != null
@@ -68,7 +66,7 @@ abstract class FastballBrowserEditorProvider : FileEditorProvider {
 }
 
 abstract class FastballBrowserEditor(url: String, private val file: VirtualFile) : UserDataHolderBase(), FileEditor {
-    private val browser = JBCefBrowser.createBuilder().setEnableOpenDevToolsMenuItem(true).setUrl(url).createBrowser()
+    private val browser = JBCefBrowser.create(JBCefBrowser.createBuilder().setEnableOpenDevToolsMenuItem(true).setUrl(url))
 
     override fun dispose() {
         Disposer.dispose(browser)
@@ -78,11 +76,11 @@ abstract class FastballBrowserEditor(url: String, private val file: VirtualFile)
 
     override fun getPreferredFocusedComponent() = browser.component
 
-    override fun setState(state: FileEditorState) {}
-
     override fun isModified() = false
 
     override fun isValid() = true
+
+    override fun setState(state: FileEditorState) {}
 
     override fun addPropertyChangeListener(listener: PropertyChangeListener) {}
 

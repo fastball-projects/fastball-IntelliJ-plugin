@@ -21,12 +21,12 @@ import javax.swing.JPanel
  * @since 2022/12/15
  */
 
-@State(name = "dev.fastball.intellij.plugin.FastballSettingsState", storages = [Storage("FastballSettings.xml")])
+@State(name = "FastballSettingsState", storages = [Storage(FASTBALL_SETTING_FILE_NAME)])
 class FastballSettingsState : PersistentStateComponent<FastballSettingsState> {
-    var proxyTarget = "http://localhost:8080"
+    var proxyTarget = FASTBALL_SETTING_DEFAULT_PROXY_TARGET
     var proxyEnabled = true
 
-    override fun getState(): FastballSettingsState? {
+    override fun getState(): FastballSettingsState {
         return this
     }
 
@@ -70,7 +70,7 @@ class FastballSettingsConfigurable : Configurable {
     override fun getPreferredFocusedComponent() = component.preferredFocusedComponent
 
     override fun createComponent(): JComponent {
-        component = FastballSettingsComponent();
+        component = FastballSettingsComponent()
         return component.panel
     }
 
@@ -91,5 +91,5 @@ class FastballSettingsConfigurable : Configurable {
         component.proxyTarget = settings.proxyTarget
     }
 
-    override fun getDisplayName() = "Fastball"
+    override fun getDisplayName() = FASTBALL_SETTING_NAME
 }

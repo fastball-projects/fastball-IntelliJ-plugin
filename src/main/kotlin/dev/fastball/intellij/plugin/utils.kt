@@ -1,5 +1,6 @@
 package dev.fastball.intellij.plugin
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
@@ -34,6 +35,10 @@ private fun buildProxyUrl(port: Int, className: String, viewType: String): Strin
 fun inputStreamToPrettyJson(input: InputStream): String = objectMapper.readTree(input).toPrettyString()
 
 fun toJson(obj: Any): String = objectMapper.writeValueAsString(obj)
+
+fun fromJson(json: ByteArray): JsonNode = objectMapper.readTree(json)
+fun <T> fromJson(json: String, clazz: Class<T>): T = objectMapper.readValue(json, clazz)
+fun <T> fromJson(json: ByteArray, clazz: Class<T>): T = objectMapper.readValue(json, clazz)
 
 fun queryStringToMap(queryString: String) = queryString
     .split("&").map { it.split("=") }.filter { it.size == 2 }.associate { it[0] to it[1] }
