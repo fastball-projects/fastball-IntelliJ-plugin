@@ -5,12 +5,19 @@ package dev.fastball.intellij.plugin
  * @author gr@fastball.dev
  * @since 2022/12/25
  */
+const val ASSET_NPM_PACKAGE = "npmPackage"
+const val ASSET_NPM_VERSION = "npmVersion"
+const val ASSET_META_URL = "metaUrl"
+const val ASSET_COMPONENT_URLS = "componentUrls"
+
 const val FASTBALL_SETTING_NAME = "Fastball"
 const val FASTBALL_SETTING_FILE_NAME = "FastballSettings.xml"
 const val FASTBALL_SETTING_DEFAULT_PROXY_TARGET = "http://localhost:8080"
 
 const val JAVA_FILE_EXT = "java"
 const val VIEW_FILE_EXT = "fbv.json"
+const val FASTBALL_VIEW_DIR_NAME = "FASTBALL-INF"
+const val FASTBALL_GENERATE_VIEW_DIR = "/classes/$FASTBALL_VIEW_DIR_NAME"
 const val FASTBALL_MATERIAL_FILE_NAME = "fastball-material.yml"
 
 const val EDITOR_TAB_NAME = "UI Editor"
