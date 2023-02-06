@@ -5,12 +5,15 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.options.Configurable
+import com.intellij.ui.PortField
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.xmlb.XmlSerializerUtil
+import java.text.DecimalFormat
 import javax.swing.JComponent
+import javax.swing.JFormattedTextField
 
 import javax.swing.JPanel
 
@@ -25,6 +28,7 @@ import javax.swing.JPanel
 class FastballSettingsState : PersistentStateComponent<FastballSettingsState> {
     var proxyTarget = FASTBALL_SETTING_DEFAULT_PROXY_TARGET
     var proxyEnabled = true
+    var editorServerPort = 23333
 
     override fun getState(): FastballSettingsState {
         return this
@@ -42,10 +46,12 @@ class FastballSettingsState : PersistentStateComponent<FastballSettingsState> {
 
 class FastballSettingsComponent {
     private val proxyTargetField = JBTextField()
+    private val editorServerPortField = PortField()
     private val proxyEnabledField = JBCheckBox("Enable api proxy")
     val panel: JPanel =
         FormBuilder.createFormBuilder().addComponent(proxyEnabledField, 1)
             .addLabeledComponent(JBLabel("ProxyUrl: "), proxyTargetField, 1, false)
+            .addLabeledComponent(JBLabel("EditorServerPort: "), editorServerPortField, 1, false)
             .addComponentFillVertically(JPanel(), 0).panel
 
     val preferredFocusedComponent: JComponent
@@ -55,6 +61,12 @@ class FastballSettingsComponent {
         get() = proxyTargetField.text
         set(newText) {
             proxyTargetField.text = newText
+        }
+
+    var editorServerPort: Int
+        get() = editorServerPortField.number
+        set(newValue) {
+            editorServerPortField.value = newValue
         }
     var proxyEnabled: Boolean
         get() = proxyEnabledField.isSelected
@@ -76,19 +88,21 @@ class FastballSettingsConfigurable : Configurable {
 
     override fun isModified(): Boolean {
         val settings = FastballSettingsState.instance
-        return (component.proxyEnabled != settings.proxyEnabled) or (component.proxyTarget != settings.proxyTarget)
+        return (component.proxyEnabled != settings.proxyEnabled) or (component.proxyTarget != settings.proxyTarget) or (component.editorServerPort != settings.editorServerPort)
     }
 
     override fun apply() {
         val settings = FastballSettingsState.instance
         settings.proxyEnabled = component.proxyEnabled
         settings.proxyTarget = component.proxyTarget
+        settings.editorServerPort = component.editorServerPort
     }
 
     override fun reset() {
         val settings = FastballSettingsState.instance
         component.proxyEnabled = settings.proxyEnabled
         component.proxyTarget = settings.proxyTarget
+        component.editorServerPort = settings.editorServerPort
     }
 
     override fun getDisplayName() = FASTBALL_SETTING_NAME

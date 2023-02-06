@@ -2,13 +2,19 @@ package dev.fastball.intellij.plugin
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.VirtualFileSystem
+import com.intellij.psi.PsiFileFactory
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootType
 import java.io.InputStream
+import java.net.BindException
 import java.net.ServerSocket
 
 
@@ -32,7 +38,11 @@ private fun buildProxyUrl(port: Int, className: String, viewType: String): Strin
     return url
 }
 
-fun inputStreamToPrettyJson(input: InputStream): String = objectMapper.readTree(input).toPrettyString()
+fun inputStreamToCustomizedPrettyJson(input: InputStream): String {
+    val jsonObject = objectMapper.readTree(input) as ObjectNode
+    jsonObject.put("customized", true);
+    return jsonObject.toPrettyString()
+}
 
 fun toJson(obj: Any): String = objectMapper.writeValueAsString(obj)
 
@@ -45,9 +55,16 @@ fun queryStringToMap(queryString: String) = queryString
 
 fun findFreePort(): Int {
     var port: Int
-    ServerSocket(0).use { socket ->
-        socket.reuseAddress = true
-        port = socket.localPort
+    try {
+        ServerSocket(FastballSettingsState.instance.editorServerPort).use { socket ->
+            socket.reuseAddress = true
+            port = socket.localPort
+        }
+    } catch (e: BindException) {
+        ServerSocket(0).use { socket ->
+            socket.reuseAddress = true
+            port = socket.localPort
+        }
     }
     if (port > 0) {
         return port
@@ -60,6 +77,17 @@ fun getViewFile(project: Project, file: VirtualFile): VirtualFile? {
     val javaRelativePath = ModuleRootManager.getInstance(module).getSourceRoots(JavaSourceRootType.SOURCE)
         .find { file.path.startsWith(it.path) }
         ?.let { "${file.parent.path.substring(it.path.length)}/${file.nameWithoutExtension}" } ?: return null
-    return ModuleRootManager.getInstance(module).getSourceRoots(JavaResourceRootType.RESOURCE)
-        .firstNotNullOfOrNull { it.findFileByRelativePath("FASTBALL-INF/$javaRelativePath.fbv.json") }
+    return getCustomizedViewFile(module, javaRelativePath) ?: getGeneratedViewFile(module, javaRelativePath)
 }
+
+fun getCustomizedViewFile(module: com.intellij.openapi.module.Module, javaRelativePath: String) =
+    ModuleRootManager.getInstance(module).getSourceRoots(JavaResourceRootType.RESOURCE).firstNotNullOfOrNull {
+        it.findFileByRelativePath("$FASTBALL_VIEW_DIR_NAME/$javaRelativePath.$VIEW_FILE_EXT")
+    }
+
+fun getGeneratedViewFile(module: com.intellij.openapi.module.Module, javaRelativePath: String) =
+    ModuleRootManager.getInstance(module).contentRoots.firstNotNullOfOrNull {
+        it.findFileByRelativePath("$FASTBALL_GENERATE_VIEW_DIR$javaRelativePath.$VIEW_FILE_EXT")
+    }
+
+fun buildUnPkgUrl(npmPackage: String, npmVersion: String) = "https://unpkg.com/$npmPackage@$npmVersion"
