@@ -1,12 +1,18 @@
 package dev.fastball.intellij.plugin
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.externalSystem.service.execution.NotSupportedException
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.util.PathUtil
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
@@ -15,8 +21,13 @@ import org.apache.http.HttpResponse
 import org.apache.http.client.methods.*
 import org.apache.http.entity.InputStreamEntity
 import org.apache.http.impl.client.HttpClients
+import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.yaml.snakeyaml.Yaml
+import java.io.FileInputStream
+import java.io.IOException
 import java.net.InetSocketAddress
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 
 
 /**
@@ -36,6 +47,10 @@ interface FastballWebService {
     }
 }
 
+typealias Test = Array<String>
+
+val b = Test(1) { "" };
+
 class FastballWebServiceImpl(override val project: Project) : FastballWebService {
     override val port = findFreePort()
     override val fileMapper = hashMapOf<String, VirtualFile>()
@@ -43,7 +58,7 @@ class FastballWebServiceImpl(override val project: Project) : FastballWebService
     init {
         val app = ApplicationManager.getApplication()
         app.runReadAction {
-            FilenameIndex.getAllFilesByExt(project, VIEW_FILE_EXT, GlobalSearchScope.projectScope(project))
+            FilenameIndex.getAllFilesByExt(project, VIEW_FILE_EXT, GlobalSearchScope.everythingScope(project))
                 .forEach { file ->
                     fromJson(file.contentsToByteArray()).get(CLASS_NAME_PARAM)?.asText()?.let { className ->
                         fileMapper[className] = file
@@ -58,19 +73,25 @@ class FastballWebServiceImpl(override val project: Project) : FastballWebService
             SaveViewHandler(this),
             ProxyHandler()
         )
-        val server = HttpServer.create(InetSocketAddress(port), 0)
+
+        val server = HttpServer.create(InetSocketAddress(port), 256)
         handlers.forEach {
             server.createContext(it.contextPath, it)
         }
+        server.executor = Executors.newFixedThreadPool(64)
         server.start()
     }
+}
 
+private class HttpExecutor : Executor {
+    override fun execute(task: Runnable) {
+        task.run()
+    }
 }
 
 class StaticResourceHandler : AutoOutputWebHandler {
     override val contextPath = CONTEXT_PATH
     override fun handlerRequest(exchange: HttpExchange): ByteArray {
-//            return FileInputStream("/Users/gr/fastball-projects/editor/" + exchange.requestURI.path).readAllBytes()
         val staticResource = FastballWebService::class.java.getResourceAsStream(exchange.requestURI.path)
             ?: throw IllegalArgumentException("Static file [${exchange.requestURI.path}] not found")
         return staticResource.readAllBytes()
@@ -82,12 +103,32 @@ class LoadAssetsHandler(private val webService: FastballWebService) : AutoOutput
     override val contextPath = ASSETS_API_PATH
     override fun handlerRequest(exchange: HttpExchange): ByteArray {
         val app = ApplicationManager.getApplication()
-        var maps = listOf<Map<String, Any>>()
+        var maps = listOf<MutableMap<String, Any>>()
         app.runReadAction {
             maps = FilenameIndex.getVirtualFilesByName(
                 FASTBALL_MATERIAL_FILE_NAME,
-                GlobalSearchScope.projectScope(webService.project)
+                GlobalSearchScope.everythingScope(webService.project)
             ).map { file -> yaml.load(file.inputStream) }
+            maps.forEach {
+                if (it[ASSET_META_URL] == null) {
+                    it[ASSET_META_URL] = buildUnPkgUrl(
+                        it[ASSET_NPM_PACKAGE] as String,
+                        it[ASSET_NPM_VERSION] as String
+                    ) + "/build/lowcode/meta.js"
+                }
+                if (it[ASSET_COMPONENT_URLS] == null) {
+                    it[ASSET_COMPONENT_URLS] = listOf(
+                        buildUnPkgUrl(
+                            it[ASSET_NPM_PACKAGE] as String,
+                            it[ASSET_NPM_VERSION] as String
+                        ) + "/build/lowcode/view.js",
+                        buildUnPkgUrl(
+                            it[ASSET_NPM_PACKAGE] as String,
+                            it[ASSET_NPM_VERSION] as String
+                        ) + "/build/lowcode/view.css"
+                    )
+                }
+            }
         }
         return toJson(maps).toByteArray()
     }
@@ -106,12 +147,70 @@ class SaveViewHandler(private val webService: FastballWebService) : AutoOutputWe
     override val contextPath = SAVE_VIEW_API_PATH
     override fun handlerRequest(exchange: HttpExchange): ByteArray {
         val query = queryStringToMap(exchange.requestURI.query)
-        val viewFile: VirtualFile = webService.fileMapper[query[CLASS_NAME_PARAM]] ?: return byteArrayOf()
-        val viewContent = inputStreamToPrettyJson(exchange.requestBody)
+        val className = query[CLASS_NAME_PARAM] ?: return byteArrayOf()
+        val viewFile: VirtualFile = webService.fileMapper[className] ?: return byteArrayOf()
+        val viewContent = inputStreamToCustomizedPrettyJson(exchange.requestBody)
         WriteCommandAction.runWriteCommandAction(webService.project) {
-            viewFile.setBinaryContent(viewContent.toByteArray())
+            writeCustomizedViewFile(viewFile, className, viewContent.toByteArray())
         }
         return viewFile.contentsToByteArray()
+    }
+
+    private fun writeCustomizedViewFile(
+        viewFile: VirtualFile,
+        className: String,
+        content: ByteArray
+    ) {
+        val module = ProjectFileIndex.getInstance(webService.project).getModuleForFile(viewFile, false)
+            ?: throw RuntimeException("File $viewFile module not found.")
+
+        val javaRelativePath = className.replace('.', '/')
+        val isCustomizedFile = ModuleRootManager.getInstance(module).getSourceRoots(JavaResourceRootType.RESOURCE)
+            .any { viewFile.path.startsWith(it.path) }
+        if (isCustomizedFile) {
+            viewFile.setBinaryContent(content)
+            return
+        }
+        val relativePath = "$FASTBALL_VIEW_DIR_NAME/$javaRelativePath.$VIEW_FILE_EXT"
+        val resourceDir =
+            ModuleRootManager.getInstance(module).getSourceRoots(JavaResourceRootType.RESOURCE).firstOrNull()
+                ?: throw RuntimeException("Module [$module] resource dir not found.")
+        resourceDir.createAndWriteFile(relativePath, content)
+    }
+
+    private fun VirtualFile.createAndWriteFile(relativePath: String, data: ByteArray): VirtualFile {
+        return try {
+            WriteAction.computeAndWait<VirtualFile, IOException> {
+                var parent = this
+                for (name in StringUtil.tokenize(
+                    PathUtil.getParentPath(
+                        relativePath
+                    ), "/"
+                )) {
+                    var child = parent.findChild(name!!)
+                    if (child == null || !child.isValid) {
+                        child =
+                            parent.createChildDirectory(SaveViewHandler::class.java, name)
+                    }
+                    parent = child
+                }
+                parent.children // need this to ensure that fileCreated event is fired
+                val name = PathUtil.getFileName(relativePath)
+                val manager = FileDocumentManager.getInstance()
+                var file = parent.findChild(name)
+                if (file == null) {
+                    file = parent.createChildData(SaveViewHandler::class.java, name)
+                } else {
+                    val document = manager.getCachedDocument(file)
+                    if (document != null) manager.saveDocument(document) // save changes to prevent possible conflicts
+                }
+                file.setBinaryContent(data)
+                manager.reloadFiles(file) // update the document now, otherwise MemoryDiskConflictResolver will do it later at unexpected moment of time
+                file
+            }
+        } catch (e: IOException) {
+            throw RuntimeException(e)
+        }
     }
 }
 

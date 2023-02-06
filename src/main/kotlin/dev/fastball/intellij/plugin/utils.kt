@@ -86,7 +86,7 @@ fun getCustomizedViewFile(module: com.intellij.openapi.module.Module, javaRelati
     }
 
 fun getGeneratedViewFile(module: com.intellij.openapi.module.Module, javaRelativePath: String) =
-    ModuleRootManager.getInstance(module).excludeRoots.firstNotNullOfOrNull {
+    ModuleRootManager.getInstance(module).contentRoots.firstNotNullOfOrNull {
         it.findFileByRelativePath("$FASTBALL_GENERATE_VIEW_DIR$javaRelativePath.$VIEW_FILE_EXT")
     }
 

@@ -16,12 +16,15 @@
     <description><![CDATA[
     <a href="https://github.com/fastball-projects/fastball">Fastball Github</a> |
     <a href="https://github.com/fastball-projects/fastball-IntelliJ-plugin">Plugin Github</a>
-    <p>
-    Fastball 是一个面向后端开发人员的, 可扩展的, 所见即所得的 Web UI 开发框架.
-    </p>
 
     <p>
     Fastball is an extension-oriented Wysiwyg UI framework for Java backends. Save your development time, try Fastball!
+    <a href="https://fastball.dev/guide/quick-start.html">Quick start</a>
+    </p>
+
+    <p>
+    Fastball 是一个面向后端开发人员的, 可扩展的, 所见即所得的 Web UI 开发框架.
+    <a href="https://fastball.dev/guide/quick-start.html">快速开始</a>
     </p>
   ]]></description>
 
