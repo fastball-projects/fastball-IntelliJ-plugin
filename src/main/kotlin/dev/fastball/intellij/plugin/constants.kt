@@ -17,7 +17,7 @@ const val FASTBALL_SETTING_DEFAULT_PROXY_TARGET = "http://localhost:8080"
 const val JAVA_FILE_EXT = "java"
 const val VIEW_FILE_EXT = "fbv.json"
 const val FASTBALL_VIEW_DIR_NAME = "FASTBALL-INF"
-const val FASTBALL_GENERATE_VIEW_DIR = "/target/classes/$FASTBALL_VIEW_DIR_NAME"
+const val FASTBALL_GENERATE_VIEW_DIR = "/classes/$FASTBALL_VIEW_DIR_NAME"
 const val FASTBALL_MATERIAL_FILE_NAME = "fastball-material.yml"
 
 const val EDITOR_TAB_NAME = "UI Editor"

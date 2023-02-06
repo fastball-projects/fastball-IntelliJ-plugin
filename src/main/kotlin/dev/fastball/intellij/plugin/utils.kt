@@ -6,11 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.intellij.openapi.module.ModuleUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.vfs.VirtualFileSystem
-import com.intellij.psi.PsiFileFactory
 import org.jetbrains.jps.model.java.JavaResourceRootType
 import org.jetbrains.jps.model.java.JavaSourceRootType
 import java.io.InputStream
@@ -86,7 +82,7 @@ fun getCustomizedViewFile(module: com.intellij.openapi.module.Module, javaRelati
     }
 
 fun getGeneratedViewFile(module: com.intellij.openapi.module.Module, javaRelativePath: String) =
-    ModuleRootManager.getInstance(module).contentRoots.firstNotNullOfOrNull {
+    ModuleRootManager.getInstance(module).excludeRoots.firstNotNullOfOrNull {
         it.findFileByRelativePath("$FASTBALL_GENERATE_VIEW_DIR$javaRelativePath.$VIEW_FILE_EXT")
     }
 
