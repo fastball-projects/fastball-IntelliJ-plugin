@@ -1,11 +1,13 @@
 package dev.fastball.intellij.plugin
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorPolicy
 import com.intellij.openapi.fileEditor.impl.text.PsiAwareTextEditorImpl
 import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import java.util.concurrent.atomic.AtomicReference
 
 
 /**
@@ -32,7 +34,11 @@ class FastballJsonViewEditorProvider : TextEditorProvider() {
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
         val viewFile = getViewFile(project, file) ?: throw IllegalStateException()
-        return FastballJsonViewEditor(project, viewFile, this, VIEW_JSON_TAB_NAME)
+        val result = AtomicReference<FileEditor>()
+        ApplicationManager.getApplication().invokeAndWait {
+            result.set(FastballJsonViewEditor(project, viewFile, this, VIEW_JSON_TAB_NAME))
+        }
+        return result.get() ?: throw IllegalStateException("Editor could not be created")
     }
 
     override fun getEditorTypeId(): String = FastballJsonViewEditorProvider::class.java.simpleName
